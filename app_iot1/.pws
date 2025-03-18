@@ -1,0 +1,15 @@
+
+#export kafka_security_protocol=SASL_SSL
+#export kafka_sasl_mechanisms=PLAIN
+#export kafka_sasl_username=3MZ4JFBQS375IUUA
+#export kafka_sasl_password=Vj8MASendaIs0j61V1uXcJ1EaZ9z4Vc8LG6cZ1XWilAJjYS05bZIk7AaGx0Y49xb
+#export kafka_bootstrap_servers=pkc-q283m.af-south-1.aws.confluent.cloud
+
+
+# when plaintext then no password is required.
+export kafka_security_protocol=PLAINTEXT
+export kafka_sasl_mechanisms=PLAIN
+export kafka_sasl_username=
+export kafka_sasl_password=
+export kafka_bootstrap_servers=localhost:9092
+export kafka_schemaregistry_servers=http://localhost:9081

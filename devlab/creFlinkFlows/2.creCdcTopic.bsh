@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Hive Metastore as catalog
+# This will pull a topic into Paimon
+
+# https://paimon.apache.org/docs/master/cdc-ingestion/kafka-cdc/
+
+
+/opt/flink/bin/flink run \
+        /opt/flink/lib/paimon/paimon-flink-action-0.9.0.jar \
+        kafka_sync_table \
+        -Dexecution.checkpointing.interval=10s \
+        -Dexecution.checkpointing.num-retained=5 \
+        -Dstate.checkpoints.num-retained=10 \
+        -Dpipeline.name='sync-kafka-topic-to-paimon-s3' \
+        --kafka_conf properties.bootstrap.servers=broker:29092 \
+        --kafka_conf topic=factory_iot \
+        --kafka_conf properties.group.id=123456 \
+        --kafka_conf value.format=json \
+        --kafka_conf scan.startup.mode=earliest-offset \
+        --catalog_conf metastore=hive \
+        --catalog_conf uri=thrift://metastore:9083 \
+        --warehouse s3a://warehouse/paimon/ \
+        --database iot \
+        --table factory_iot \
+        --table_conf sink.parallelism=4 
+
+
+        --mode divided \
+        --partition_keys pt \
+        --computed_column 'pt=date_format(event_tm, yyyyMMdd)' \
+        
+        --table_conf bucket=2 \
+        
+        --kafka_conf schema.registry.url=http://schema-registry:9081 \
+
+
+       --partition_keys timeslot_year \
+        --computed_column 'timeslot_year=year(ts)'
+        --computed_column 'timeslot_year=year(ts)', 'timeslot_month=month(ts)'
+
+
+ 
+ 

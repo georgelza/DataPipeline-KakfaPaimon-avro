@@ -1,0 +1,381 @@
+# docker-compose -p my-project up -d --build
+# or
+# export COMPOSE_PROJECT_NAME=my-project
+# docker-compose up -d --build
+#
+# inspect network: docker network inspect devlab
+#
+
+configs:
+  hive-site:
+    file: ./conf/hive-site.xml
+  flink-conf:
+    file: ./conf/flink-conf.yaml
+
+  log4j:
+    file: ./conf/log4j.properties
+  log4j-console:
+    file: ./conf/log4j-console.properties
+  log4j-session:
+    file: ./conf/log4j-session.properties
+
+  postgres_conf:
+    file: ./conf/postgresql.conf
+  postgres_hba:
+    file: ./conf/pg_hba.conf
+
+  creCat:
+    file: ./creFlinkFlows/1.creCat.sql
+  creCdCTopic:
+    file: ./creFlinkFlows/2.creCdcTopic.bsh
+
+services:
+
+  # Core Confluent Kafka bits
+  broker:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: broker
+    hostname: broker
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      # Replace CLUSTER_ID with a unique base64 UUID using "bin/kafka-storage.sh random-uuid" 
+      # See https://docs.confluent.io/kafka/operations-tools/kafka-tools.html#kafka-storage-sh
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.1
+    container_name: schema-registry
+    hostname: schema-registry
+    depends_on:
+      - broker
+    ports:
+      - "9081:9081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:9081
+      
+
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:7.7.1
+    container_name: control-center
+    hostname: control-center
+    depends_on:
+      - broker
+    ports:
+      - "9021:9021"     # -> Web UI console
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:29092'
+      CONTROL_CENTER_CONNECT_CONNECT-DEFAULT_CLUSTER: 'connect:8083'
+      CONTROL_CENTER_CONNECT_HEALTHCHECK_ENDPOINT: '/connectors'
+      CONTROL_CENTER_KSQL_KSQLDB1_URL: "http://ksqldb-server:8088"
+      CONTROL_CENTER_KSQL_KSQLDB1_ADVERTISED_URL: "http://localhost:8088"
+      CONTROL_CENTER_SCHEMA_REGISTRY_URL: "http://schema-registry:9081"
+      CONTROL_CENTER_REPLICATION_FACTOR: 1
+      CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
+      CONFLUENT_METRICS_TOPIC_REPLICATION: 1
+      PORT: 9021
+
+  kcat:
+    image: confluentinc/cp-kcat:7.7.1
+    container_name: kcat
+    hostname: kcat
+    depends_on:
+      - broker
+    entrypoint: /bin/bash -i
+    tty: true
+
+
+  # Apache Flink bits    
+  flink-jobmanager:
+    user: "9999:9999"
+    image: georgelza/apacheflink:1.19.1-scala_2.12-java11
+    ports:
+      - "8081:8081"
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+    volumes:
+      - ./data/flink/logs:/opt/flink/log
+      - ./data/flink/checkpoints:/opt/flink/checkpoints
+      - ./data/flink/rocksdb:/opt/flink/rocksdb
+
+      - ./data/flink/lib/paimon:/opt/flink/lib/paimon
+      - ./data/flink/lib/kafka:/opt/flink/lib/kafka
+      - ./data/flink/lib/hadoop:/opt/flink/lib/hadoop
+      - ./data/flink/lib/hive:/opt/flink/lib/hive
+    configs:
+      - source: hive-site
+        target: /opt/flink/conf/hive-site.xml
+      - source: flink-conf
+        target: /opt/flink/conf/flink-conf.yaml
+      - source: log4j
+        target: /opt/flink/conf/log4j.properties
+      - source: log4j-console
+        target: /opt/flink/conf/log4j-console.properties
+      - source: log4j-session
+        target: /opt/flink/conf/log4j-session.properties
+      - source: creCat
+        target: /sql/creCat.sql
+      - source: creCdCTopic
+        target: /bsh/creCdcTopic.bsh
+
+    command: jobmanager
+
+
+  flink-taskmanager:
+    user: "9999:9999"
+    image: georgelza/apacheflink:1.19.1-scala_2.12-java11
+    depends_on:
+      - flink-jobmanager
+    deploy:
+      replicas: 1
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - env.log.level=DEBUG
+          
+    volumes:
+      - ./data/flink/logs:/opt/flink/log
+      - ./data/flink/checkpoints:/opt/flink/checkpoints
+      - ./data/flink/rocksdb:/opt/flink/rocksdb
+
+      - ./data/flink/lib/paimon:/opt/flink/lib/paimon
+      - ./data/flink/lib/kafka:/opt/flink/lib/kafka
+      - ./data/flink/lib/hadoop:/opt/flink/lib/hadoop
+      - ./data/flink/lib/hive:/opt/flink/lib/hive
+    configs:
+      - source: hive-site
+        target: /opt/flink/conf/hive-site.xml
+      - source: flink-conf
+        target: /opt/flink/conf/flink-conf.yaml
+      - source: log4j
+        target: /opt/flink/conf/log4j.properties
+      - source: log4j-console
+        target: /opt/flink/conf/log4j-console.properties
+      - source: log4j-session
+        target: /opt/flink/conf/log4j-session.properties
+    command: taskmanager
+
+
+  # S3-Amazon Compatible store, as storage for Apache Paimon
+  # http://localhost:9001/browser
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    hostname: minio
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+    ports:
+      - 9001:9001  # Web UI console
+      - 9000:9000  # api address
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - ./data/minio:/data
+
+
+  # https://hub.docker.com/r/minio/mc
+  # Minio Client
+  mc:
+    image: minio/mc:latest
+    container_name: mc
+    hostname: mc
+ #  depends_on:
+ #     - minio
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio ${S3_ENDPOINT_URL} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc rm -r --force minio/${S3_BUCKET};
+      /usr/bin/mc mb minio/${S3_BUCKET};
+      tail -f /dev/null
+      " 
+
+
+  # Datastore for Hive Metastore 
+  postgres:
+    image: ${REPO_NAME}/postgres:12.0
+    container_name: postgres
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - ${DATABASE_PORT}:5432
+    environment:
+      - POSTGRES_USER=${DATABASE_USER}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_DB=${DATABASE_DB}
+    healthcheck:
+      test: ["CMD", "psql", "-U", "${DATABASE_USER}", "${DATABASE_DB}"]
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    configs:
+      - source: postgres_conf
+        target: /etc/postgresql/postgresql.conf
+      - source: postgres_hba
+        target: /etc/postgresql/data/pg_hba.conf
+    command: -c config_file=/etc/postgresql/postgresql.conf
+
+
+  # Hive Metastore 3.1.3
+  # HADOOP_VERSION=3.3.5
+  # POSTGRES_CONNECTOR_VERSION=42.7.3
+  #
+  # Launch Standalone Metastore With External RDBMS (Postgres)
+  # If you want to use your own core-site.xml/hdfs-site.xml/yarn-site.xml or hive-site.xml for the service, 
+  # you can provide the environment variable HIVE_CUSTOM_CONF_DIR for the command. For example:
+  # Put the custom configuration file under the directory /opt/hive/conf and run:
+  metastore:
+    image: ${REPO_NAME}/hive-metastore-3.1.3-java8:1.0.0
+    container_name: metastore
+    hostname: metastore
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: ${DATABASE_TYPE_JDBC}
+      IS_RESUME: "true"
+      SERVICE_OPTS: '-Xmx512m 
+                    -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+                    -Djavax.jdo.option.ConnectionURL=jdbc:${DATABASE_TYPE_JDBC}://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_DB}?sslmode=disable
+                    -Djavax.jdo.option.ConnectionUserName=${DATABASE_USER}
+                    -Djavax.jdo.option.ConnectionPassword=${DATABASE_PASSWORD}'
+    env_file:
+      - ./conf/hive.env
+    ports:
+      - 9083:9083   # Hive Metastore access port
+    depends_on:
+      - postgres
+      - mc
+    volumes:
+      - ./data/warehouse:/opt/hive/data/warehouse
+    command: hivemetastore
+
+
+  # Using HS2 with Standalone/Remote Metastore
+  # "-Dhive.metastore.uris is used to specify the external Metastore
+  # NOTE: To save the data between container restarts, you can start the HiveServer2 with mounted volume:
+  hiveserver2:
+    image: ${REPO_NAME}/hive-hiveserver2-3.1.3-java8:1.0.0
+    container_name: hiveserver2
+    hostname: hiveserver2
+    restart: unless-stopped
+    environment:
+      - SERVICE_NAME=hiveserver2
+      - IS_RESUME="true"
+      - SERVICE_OPTS='-Xmx512m 
+                    -Dhive.metastore.uris=thrift://metastore:9083'
+    env_file:
+      - ./conf/hive.env
+    ports:
+      - 10000:10000   # Hive server2 port
+      - 10001:10001
+      - 10002:10002   # HiveServer2 Web UI
+    depends_on:
+      - metastore
+    volumes:
+      - ./data/warehouse:/opt/hive/data/warehouse
+    command: hiveserver
+
+
+
+# IOT Payload generator -> Dockerrized
+  iot1_datagen:
+    image: georgelza/iot_datagen:2.0
+    hostname: iot1_datagen
+    container_name: iot1_datagen
+    environment:
+      TIMESTAMP_FIELD: ${TIMESTAMP_FIELD}
+      METADATA_FIELD: ${METADATA_FIELD}
+      RETENSION_LEVEL: ${RETENSION_LEVEL}
+      CONSOLE_DEBUGLEVEL: 0
+      FILE_DEBUGLEVEL: 0
+      ECHOSEEDFILE: 0
+      LOGGINGFILE: logger_north
+      SEEDFILE: conf/Full.json
+      SITEIDS: 101,104
+      FILEROOT: telemetry_north
+      TSHUMAN: 1
+      STRUCTMOD: 0
+      DEVICETYPE: 0
+
+    volumes:
+      - ../app_iot1/conf/:/app/conf
+      - ../app_iot1/logs/:/app/logs
+
+  iot2_datagen:
+    image: georgelza/iot_datagen:2.0
+    hostname: iot2_datagen
+    container_name: iot2_datagen
+    environment:
+      TIMESTAMP_FIELD: ${TIMESTAMP_FIELD}
+      METADATA_FIELD: ${METADATA_FIELD}
+      RETENSION_LEVEL: ${RETENSION_LEVEL}
+      CONSOLE_DEBUGLEVEL: 0
+      FILE_DEBUGLEVEL: 0
+      ECHOSEEDFILE: 0
+      LOGGINGFILE: logger_south
+      SEEDFILE: conf/Full.json
+      SITEIDS: 102,105
+      FILEROOT: telemetry_south
+      TSHUMAN: 1
+      STRUCTMOD: 1
+      DEVICETYPE: 0
+
+    volumes:
+      - ../app_iot1/conf/:/app/conf
+      - ../app_iot2/logs/:/app/logs
+
+  iot3_datagen:
+    image: georgelza/iot_datagen:2.0
+    hostname: iot3_datagen
+    container_name: iot3_datagen
+    environment:
+      TIMESTAMP_FIELD: ${TIMESTAMP_FIELD}
+      METADATA_FIELD: ${METADATA_FIELD}
+      RETENSION_LEVEL: ${RETENSION_LEVEL}
+      CONSOLE_DEBUGLEVEL: 0
+      FILE_DEBUGLEVEL: 0
+      ECHOSEEDFILE: 0
+      LOGGINGFILE: logger_east
+      SEEDFILE: conf/Full.json
+      SITEIDS: 103,106
+      FILEROOT: telemetry_east
+      TSHUMAN: 1
+      STRUCTMOD: 1
+      DEVICETYPE: 1
+
+    volumes:
+      - ../app_iot1/conf/:/app/conf
+      - ../app_iot3/logs/:/app/logs
+
+# Without a network explicitly defined, you hit this Hive/Thrift error
+# java.net.URISyntaxException Illegal character in hostname
+# https://github.com/TrivadisPF/platys-modern-data-platform/issues/231
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}

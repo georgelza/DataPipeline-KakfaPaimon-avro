@@ -1,0 +1,44 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Everything in any directory
+*.tar.gz
+*.jar
+*.parquet
+*.avro
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+*.log
+
+# Password/Credentials
+#devlab/.env
+#.pwd
+
+.DS_Store
+.idea/
+.vscode/
+venv/*
+
+infrastructure/build-hive-openjdk8/basehadoop/stage/*
+infrastructure/build-hive-openjdk8/basehive/stage/*
+
+app_iot1/__pycache__/*
+app_iot2/__pycache__/*
+
+oddbits/*
+
+devlab/creConnect/.pwdmongoatlas
+
+devlab/data/mongodb/*
+devlab/data/flink/*
+devlab/data/minio/*
+devlab/data/warehouse/*
+devlab/data/postgres/*

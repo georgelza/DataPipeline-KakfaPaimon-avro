@@ -1,0 +1,67 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",   
+    "properties": {
+        "ts": {
+            "description": "Timestamp in milliseconds since epoch (UTC)",
+            "type": "number"
+        },
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "siteId": {
+                    "description": "Factory ID",
+                    "type": "number"
+                },
+                "deviceId": {
+                    "description": "Machine ID",
+                    "type": "number"
+                },
+                "sensorId": {
+                    "description": "Sensor Id",
+                    "type": "number"
+                },
+                "unit": {
+                    "description": "Unit of Measure of the sensor",
+                    "type": "string"
+                },
+                "ts_human": {
+                    "description": "Timestamp in milliseconds since epoch (UTC)/ Human readable",
+                    "type": "string"
+                },
+                "location": {
+                    "type": "object",
+                    "properties": {
+                        "latitude": {
+                            "description": "Latitude of the Site, if the factory is say a moving object it can be the current Latitude when measurement was read",
+                            "type": "number"
+                        },
+                        "longitude": {
+                            "description": "Longitude of the Site, if the factory is say a moving object it can be the current Longitude when measurement was read",
+                            "type": "number"
+                        }
+                    }
+                },
+                "deviceType": {
+                    "description": "Type of Machine",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "siteId",
+                "deviceId",
+                "sensorId",
+                "unit"
+            ]
+        },
+        "measurement": {
+            "description": "Measured value of sensor",
+            "type": "number"
+        }
+    },
+    "required": [
+        "ts",
+        "metadata",
+        "measurement"
+    ]
+}
