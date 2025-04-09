@@ -122,6 +122,7 @@ services:
       - ./data/flink/rocksdb:/opt/flink/rocksdb
 
       - ./data/flink/lib/paimon:/opt/flink/lib/paimon
+      - ./data/flink/lib/flink:/opt/flink/lib/flink
       - ./data/flink/lib/kafka:/opt/flink/lib/kafka
       - ./data/flink/lib/hadoop:/opt/flink/lib/hadoop
       - ./data/flink/lib/hive:/opt/flink/lib/hive
@@ -162,6 +163,7 @@ services:
       - ./data/flink/rocksdb:/opt/flink/rocksdb
 
       - ./data/flink/lib/paimon:/opt/flink/lib/paimon
+      - ./data/flink/lib/flink:/opt/flink/lib/flink
       - ./data/flink/lib/kafka:/opt/flink/lib/kafka
       - ./data/flink/lib/hadoop:/opt/flink/lib/hadoop
       - ./data/flink/lib/hive:/opt/flink/lib/hive
@@ -220,6 +222,7 @@ services:
 
   # Datastore for Hive Metastore 
   postgres:
+    user: "9999:9999"
     image: ${REPO_NAME}/postgres:12.0
     container_name: postgres
     hostname: postgres
@@ -233,7 +236,7 @@ services:
     healthcheck:
       test: ["CMD", "psql", "-U", "${DATABASE_USER}", "${DATABASE_DB}"]
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres/data:/var/lib/postgresql/data
     configs:
       - source: postgres_conf
         target: /etc/postgresql/postgresql.conf
@@ -305,7 +308,7 @@ services:
 
 # IOT Payload generator -> Dockerrized
   iot1_datagen:
-    image: georgelza/iot_datagen:2.0
+    image: georgelza/iot_datagen:3.2
     hostname: iot1_datagen
     container_name: iot1_datagen
     environment:
@@ -328,7 +331,7 @@ services:
       - ../app_iot1/logs/:/app/logs
 
   iot2_datagen:
-    image: georgelza/iot_datagen:2.0
+    image: georgelza/iot_datagen:3.2
     hostname: iot2_datagen
     container_name: iot2_datagen
     environment:
@@ -351,7 +354,7 @@ services:
       - ../app_iot2/logs/:/app/logs
 
   iot3_datagen:
-    image: georgelza/iot_datagen:2.0
+    image: georgelza/iot_datagen:3.2
     hostname: iot3_datagen
     container_name: iot3_datagen
     environment:

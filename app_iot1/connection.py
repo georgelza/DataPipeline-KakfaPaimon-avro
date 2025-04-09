@@ -7,57 +7,63 @@
 #
 #   Description         :   This tries to simulate sources (this case factories at the mooment) as realist as possible.
 #
-#   Created     	    :   22 November 2024
+#   Created     	    :   10 May 2025
 #
 #   Changelog           :   Modified from original from previous blog that posted to Mongo to now to post to Kafka.
-#                       :   To make is "nice" i added allot of code to json serialize/encode the payload.
-#                       :   the payload itself can be slightly modified by changing 0 to 1 of
-#                       :   TSHUMAN, STRUCTMOD and DEVICETYPE in the runX.sh file or the dockercompose environment variables section.
+#                       :   To make is "nice" i added allot of code to avro serialize/encode the payload in this version.
+#                       :   the payload itself can be slightly modified by changing 0 to 1 the fllowing variables: 
+#                       :   TSHUMAN, STRUCTMOD and DEVICETYPE in the runX.sh file or the docker compose.yamo environment variables section.
 #
 #   JSON Viewer         :   https://jsonviewer.stack.hu
 #
-#   Mongodb             :   https://www.mongodb.com/cloud/atlas      
-#                       :   https://hub.docker.com/r/mongodb/mongodb-atlas-local
-#
 #   Notes               :   
 #
+#   json to avro schema	: http://www.dataedu.ca/avro
 #
 ########################################################################################################################
 
 __author__      = "George Leonard"
 __email__       = "georgelza@gmail.com"
-__version__     = "3.0.0"
+__version__     = "3.2.0"
 __copyright__   = "Copyright 2024, - G Leonard"
 
 
-import json, socket
+import json, socket, os
 
-from confluent_kafka import SerializingProducer, KafkaError, KafkaException
+# from confluent_kafka import avro, Producer, KafkaError, KafkaException
+# from confluent_kafka.avro import CachedSchemaRegistryClient, MessageSerializer
+
+from confluent_kafka import avro, KafkaException, KafkaError
+from confluent_kafka.avro import AvroProducer 
+
+
+from confluent_kafka import SerializingProducer
 from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.serialization import StringSerializer, SerializationContext, MessageField
-from confluent_kafka.schema_registry.json_schema import JSONSerializer
+from confluent_kafka.schema_registry.avro import AvroSerializer
+from confluent_kafka.schema_registry import Schema
 
 
 def createConnectionToStore(config_params, site, logger):
         
     if site["data_persistence"] == 1:   
-        return createFileConnection(config_params, site["siteId"], logger), None
+        return createFileConnection(config_params, site["siteId"], logger)
 
-    else:        
-        return createKafkaProducer(config_params, site["siteId"], logger)
+    else:  
+        return avro_producer(config_params, site["siteId"], logger)    
+#        return createKafkaProducer(config_params, site["siteId"], logger)
 
     # end if
 # end createConnectionToStore
 
 
-def savePayloadToStore(connection, json_serializer, site, mode, payload, topic, logger):
+def savePayloadToStore(connection, site, mode, payload, topic, logger):
     
     if site["data_persistence"] == 1:
         return writeToFile(connection, site["siteId"], mode, payload, logger)
     
     else:
         # Change to Kafka
-        return postToKafka(connection, json_serializer, site["siteId"], mode, payload, topic, logger)
+        return postToKafka(connection, site["siteId"], mode, payload, topic, logger)
         
     # end if
 # end savePayloadToStore
@@ -100,7 +106,7 @@ def createFileConnection(config_params, siteId, logger):
         # end if                                 
                        
     except IOError as err:
-        logger.critical('connection.createFileConnection - {siteId} - FAILED Err: {err} '.format(
+        logger.critical('connection.createFileConnection - {siteId} - FAILED IO Err: {err} '.format(
             siteId = siteId,
             err    = err
         ))
@@ -135,7 +141,7 @@ def writeToFile(file, siteId, mode, payload, logger):
             return 1
    
     except IOError as err:
-        logger.error('connection.writeToFile - {siteId} - mode {mode} - FAILED, Err: {err}'.format(
+        logger.error('connection.writeToFile - {siteId} - mode {mode} - FAILED, IO Err: {err}'.format(
             siteId = siteId,
             mode   = mode,
             err    = err
@@ -165,7 +171,6 @@ def closeFileConnection(file, siteId, mode, logger):
 # end close_file
 
 
-
 def error_cb(err, logger):
     """ The error callback is used for generic client errors. These
         errors are generally to be considered informational as the client will
@@ -187,406 +192,308 @@ def error_cb(err, logger):
 # end error_cb
 
 
-class Payload(object):
+def load_avro_schema_from_file(siteId, logger):
     
-    """
-    Payload record
+    key_schema      = None
+    value_schema    = None
+    
+    try:
+        key_schema   = avro.load('./avro/factory_iot-key.avsc')
+        value_schema = avro.load('./avro/factory_iot-value.avsc')
 
-    Args:
-        ts (integer): 
-        metadata (dict): 
-            siteId (integer)
-            deviceId (integer)
-            sensorId (integer)
-            unit (string)
-            ts_human (string)
-            location (dict)
-                Longitude (integer)
-                Latitude (integer)
-            deviceType (string)
-        measurement(number)
+    except Exception as err:
+        logger.fatal('connection.load_avro_schema_from_file - FAILED, for: {siteId}, Other Err: {err}'.format(
+            siteId  = siteId,
+            err     = err
+        ))
+
+    return key_schema, value_schema
+#end
+
+
+def get_schema_from_schema_registry(schema_registry_url, schema_registry_subject, siteId, logger):
+    
+    sr              = None
+    latest_version  = None
+    
+    try:
+        sr = SchemaRegistryClient({'url': schema_registry_url})
+        latest_version = sr.get_latest_version(schema_registry_subject)
         
-    """
-
-    def __init__(self, ts, metadata, measurement):
-        self.ts                 = ts
-        self.metadata           = metadata
-        self.measurement        = measurement
-
-# end
-
-
-class Location(object):
+    except KafkaError as kerr:
+        logger.fatal('connection.get_schema_from_schema_registry - FAILED, for: {siteId}, Kafka Err: {kerr}'.format(
+            siteId  = siteId,
+            kerr    = kerr
+        ))
     
-    def __init__(self, longitude, latitude):
-        self.longitude  = longitude
-        self.latitude   = latitude
-
-    def to_dict(self):
-        return {
-            "longitude":    self.longitude
-           ,"latitude":     self.latitude
-        }
-# end
-
-
-class Metadata(object):
-    
-    def __init__(self, siteId, deviceId, sensorId, unit, ts_human=None, location=None, deviceType=None):
-        self.siteId     = siteId
-        self.deviceId   = deviceId
-        self.sensorId   = sensorId
-        self.unit       = unit
-        self.ts_human   = ts_human if ts_human else None
-        self.location   = location if location else None
-        self.deviceType = deviceType if deviceType else None
-
-    def to_dict(self):
+    except Exception as err:
+        logger.fatal('connection.get_schema_from_schema_registry - FAILED, for: {siteId}, Other Err: {err}'.format(
+            siteId  = siteId,
+            err     = err
+        ))
         
-        # Compulsory fields
-        data = {
-            "siteId":   self.siteId,
-            "deviceId": self.deviceId,
-            "sensorId": self.sensorId,
-            "unit":     self.unit,
-        }
+    return sr, latest_version
+#end
 
-        # Optional Fields
-        # Conditionally add `ts_human` => Human readable timestamp
-        if self.ts_human:
-            data["ts_human"] = self.ts_human
 
-        # Conditionally add `location` if they exist
-        if self.location:
-            data["location"] = self.location.to_dict()
-            
-        # Conditionally add `deviceType` if they exist
-        if self.deviceType:
-            data["deviceType"] = self.deviceType
+def register_schema(schema_registry_url, schema_registry_subject, schema_str, siteId, logger):
 
-        return data
-# end
-
+    sr          = None
+    schema_id   = None
         
-# JSON Serializer
-def obj_to_json(obj, ctx):
+    try:
+        sr          = SchemaRegistryClient({'url': schema_registry_url})
+        schema      = Schema(schema_str, schema_type="AVRO")
+        schema_id   = sr.register_schema(subject_name=schema_registry_subject, schema=schema)
+
+    except KafkaError as kerr:
+        logger.fatal('connection.register_schema - FAILED, for: {siteId}, Kafka Err: {kerr}'.format(
+            siteId  = siteId,
+            kerr    = kerr
+        ))
     
-    return dict(
-        ts          = obj.ts,
-        metadata    = obj.metadata.to_dict(),  # Convert Metadata object to dictionary
-        measurement = obj.measurement
-    )
-#end obj_to_json
+    except Exception as err:
+        logger.fatal('connection.register_schema - FAILED, for: {siteId}, Other Err: {err}'.format(
+            siteId  = siteId,
+            err     = err
+        ))
+
+    return schema_id
+#end 
+
+
+# https://github.com/confluentinc/confluent-kafka-python/blob/master/examples/avro_producer.py
+def avro_producer(config_params, siteId, logger):
+    
+    producer = -1
+    
+    try:
+
+        # schema_id = register_schema(schema_registry_url, schema_registry_subject, schema_str, siteId, logger)
+        # schema_id = register_schema(schema_registry_url, schema_registry_subject, schema_str, siteId, logger)
+
+        # key schema registry
+        key_sr, key_latest_version = get_schema_from_schema_registry(
+            schema_registry_url     = config_params["KAFKA_SCHEMAREGISRY"], 
+            schema_registry_subject = config_params["KAFKA_TOPIC"]+"-key",
+            siteId                  = siteId, 
+            logger                  = logger
+        )
+
+        key_avro_serializer = AvroSerializer(
+            schema_registry_client  = key_sr,
+            schema_str              = key_latest_version.schema.schema_str,
+            conf                    = {
+                'auto.register.schemas': True
+            }
+        )
+
+        # value chema registry
+        value_sr, value_latest_version = get_schema_from_schema_registry(
+            schema_registry_url     = config_params["KAFKA_SCHEMAREGISRY"], 
+            schema_registry_subject = config_params["KAFKA_TOPIC"]+"-value",
+            siteId                  = siteId, 
+            logger                  = logger
+        )
+
+        value_avro_serializer = AvroSerializer(
+            schema_registry_client  = value_sr,
+            schema_str              = value_latest_version.schema.schema_str,
+            conf                    = {
+                'auto.register.schemas': True
+            }
+        )
+
+        # Kafka Producer
+        producer = SerializingProducer({
+            'bootstrap.servers':    config_params["BOOTSTRAP_SERVERS"],
+            'security.protocol':    config_params["SECURITY_PROTOCOL"],
+            'key.serializer':       key_avro_serializer,
+            'value.serializer':     value_avro_serializer,
+            'delivery.timeout.ms':  120000, # set it to 2 mins
+            'enable.idempotence':   True
+        })
+        
+    except KafkaError as kerr:
+        logger.fatal('connection.avro_producer - FAILED, for: {siteId}, Kafka Err: {kerr}'.format(
+            siteId  = siteId,
+            kerr    = kerr
+        ))
+    
+    except Exception as err:
+        logger.fatal('connection.avro_producer - FAILED, for: {siteId}, Other Err: {err}'.format(
+            siteId  = siteId,
+            err     = err
+        ))
+    
+    return producer
+#end
 
 
 # https://www.youtube.com/watch?v=HX0yx5YX284    
 def createKafkaProducer(config_params, siteId, logger):
-       
-    connection          = None  # Ensure it's initialized
-        
-    # Core Producer Connection  
-    if config_params["SECURITY_PROTOCOL"] != "PLAINTEXT" :
-        producer_conf = {
-            'bootstrap.servers':    config_params["BOOTSTRAP_SERVERS"],
-            'sasl.mechanism':       config_params["SASL_MECHANISMS"],
-            'security.protocol':    config_params["SECURITY_PROTOCOL"],
-            'sasl.username':        config_params["SASL_USERNAME"],
-            'sasl.password':        config_params["SASL_PASSWORD"],
-            'client.id':            socket.gethostname(),
-            'error_cb':             error_cb,
-        }
-    else:
-        producer_conf = {
-            "bootstrap.servers":    config_params["BOOTSTRAP_SERVERS"],
-            "security.protocol":    config_params["SECURITY_PROTOCOL"],
-            "sasl.mechanism":       config_params["SASL_MECHANISMS"],
-            'client.id':            socket.gethostname(),
-            'error_cb':             error_cb,
-        }        
-    # end
+    
+ 
+    producer = None  # Ensure it's initialized
 
+    key_schema, value_schema = load_avro_schema_from_file()
+    
+    # Create producer
     try:
-        # Create producer
-        connection = SerializingProducer(producer_conf)
-        
-    except KafkaError as kerr:
-         logger.error('connection.createKafkaProducer.SerializingProducer - FAILED, Err: {kerr}'.format(
-            kerr=kerr
-        ))
-                
-    except Exception as err:
-        logger.error('connection.createKafkaProducer.SerializingProducer - FAILED, Err: {err}'.format(
-            err=err
-        ))
-
-        return None, None  # Ensure failure is handled properly
-
-    # end
-
-    # Schema Definition  - Temp here for now
-    json_schema_str = {
-        "$schema": "http://json-schema.org/draft-04/schema#",
-        "type": "object",
-        "properties": {
-            "ts": {
-                "description": "Timestamp in milliseconds since epoch (UTC)",
-                "type": "number",
-            },
-            "metadata": {
-                "type": "object",
-                "properties": {
-                    "siteId": {
-                        "description": "Factory ID",
-                        "type": "number"
-                    },
-                    "deviceId": {
-                        "description": "Machine ID",
-                        "type": "number"
-                    },
-                    "sensorId": {
-                        "description": "Sensor Id",
-                        "type": "number"
-                    },
-                    "unit": {
-                        "description": "Unit of Measure of the sensor",
-                        "type": "string"
-                    },
-                    "ts_human": {
-                        "description": "Timestamp in milliseconds since epoch (UTC)/ Human readable",
-                        "type": "string",
-                    },
-                    "location": {
-                        "type": "object",
-                        "properties": {
-                            "latitude": {
-                                "description": "Latitude of the Site, if the factory is say a moving object it can be the current Latitude when measurement was read",
-                                "type": "number"
-                            },
-                            "longitude": {
-                                "description": "Longitude of the Site, if the factory is say a moving object it can be the current Longitude when measurement was read",
-                                "type": "number"
-                            }
-                        }
-                    },
-                    "deviceType": {
-                        "description": "Type of Machine",
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "siteId",
-                    "deviceId",
-                    "sensorId",
-                    "unit"
-                ]
-            },
-            "measurement": {
-                "description": "Measured value of sensor",
-                "type": "number"
+        # Core Producer Connection  
+        if config_params["SECURITY_PROTOCOL"] != "PLAINTEXT" :
+            conf = {
+                'bootstrap.servers':    config_params["BOOTSTRAP_SERVERS"],
+                'sasl.mechanism':       config_params["SASL_MECHANISMS"],
+                'security.protocol':    config_params["SECURITY_PROTOCOL"],
+                'sasl.username':        config_params["SASL_USERNAME"],
+                'sasl.password':        config_params["SASL_PASSWORD"],
+                'schema.registry.url' : config_params["KAFKA_SCHEMAREGISRY"],
+                'client.id':            socket.gethostname(),
+                'error_cb':             error_cb
             }
-        },
-        "required": [
-            "ts",
-            "metadata",
-            "measurement"
-        ]
-    }
+        else:
+            conf = {
+                "bootstrap.servers":    config_params["BOOTSTRAP_SERVERS"],
+                "security.protocol":    config_params["SECURITY_PROTOCOL"],
+                "sasl.mechanism":       config_params["SASL_MECHANISMS"],
+                'schema.registry.url' : config_params["KAFKA_SCHEMAREGISRY"],
+                'client.id':            socket.gethostname(),
+                'error_cb':             error_cb
+            }        
+        # end        
 
-        
+        if key_schema != None and value_schema != None:
+            producer = AvroProducer(
+                conf,
+                default_key_schema   = key_schema,
+                default_value_schema = value_schema
+            )
 
-    # Schema Registry Serializer
-    try:
                 
-        schema_registry_client = SchemaRegistryClient(
-            {"url": config_params["KAFKA_SCHEMAREGISRY"]}
-        )
-    
-        json_serializer = JSONSerializer(
-            schema_str             = json.dumps(json_schema_str), 
-            schema_registry_client = schema_registry_client,
-            to_dict                = obj_to_json,
-        )
+    except KafkaError as kerr:
+        logger.fatal('connection.createKafkaProducer.AvroProducer - FAILED, for: {siteId}, Kafka Err: {kerr}'.format(
+            siteId  = siteId,
+            kerr    = kerr
+        ))
     
     except Exception as err:
-        logger.error('connection.createKafkaProducer.JSONSerializer - FAILED, Err: {url}, {err}'.format(
-            url = config_params["KAFKA_SCHEMAREGISRY"],
-            err = err
+        logger.fatal('connection.createKafkaProducer.AvroProducer - FAILED, for: {siteId}, Other Err: {err}'.format(
+            siteId  = siteId,
+            err     = err
         ))
-        return None, None  # Ensure failure is handled properly
 
-    # end
-
+    #end try 
 
     logger.info("Kafka Producer instantiated for: {siteId}, {connection}".format(
         siteId     = siteId,
-        connection = connection
+        connection = producer
     ))
     
     logger.info("")
     
-    return connection, json_serializer
+    return producer
 
 #end createKafkaProducer
 
 
-def buildPayload(payloadobj, siteId, logger):
+# 
+# look at for avro producer using class type
+# https://github.com/confluentinc/confluent-kafka-python/blob/master/examples/avro_producer.py
+# https://www.redpanda.com/blog/produce-consume-apache-avro-tutorial
+# https://gist.github.com/OneCricketeer/4db67f51fcaa02776340237762950b67
+# https://medium.com/@mrugankray/create-avro-producer-for-kafka-using-python-f9029d9b2802
 
-    # ts
-    try:
-
-        ts  = payloadobj.get("ts")
-        
-    except Exception as err:
-        logger.error("Payload before serialization: buildPayload.ts: {siteId}, {err}".format(
-            siteId  = siteId,
-            err     = err
-        ))
-    #end try ts
+def postToKafka(producer, key, mode, payloadmsg, topic, logger):
     
-    
-    # metadata
-    try:
-        
-        met = payloadobj.get("metadata")
-        
-        # Construct metadata
-        if met.get("ts_human"):
-            if met.get("location"):
-                
-                loc      = met.get("location")
-                location = Location(loc.get("longitude"), loc.get("latitude"))
-                
-                if met.get("deviceType"):
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), met.get("ts_human"), location, met.get("deviceType"))
+    topic  = topic[0]
+    keyval = {"siteId": key}
 
-                else: 
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), met.get("ts_human"), location, None)
-
-                #end if
-            else:
-
-                if met.get("deviceType"):
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), met.get("ts_human"), None, met.get("deviceType"))
-
-                else: 
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), met.get("ts_human"), None, None)
-
-                #end if
-            #end if
-        else:
-            if met.get("location"):
-                loc      = met.get("location")
-                location = Location(loc.get("longitude"), loc.get("latitude"))
-                
-                if met.get("deviceType"):
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), None, location, met.get("deviceType"))
-
-                else: 
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), None, location, None)
-
-                #end if                
-            else:
-                
-                if met.get("deviceType"):
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), None, None, met.get("deviceType"))
-
-                else: 
-                    metadata = Metadata(met.get("siteId"), met.get("deviceId"), met.get("sensorId"), met.get("unit"), None, None, None)
-
-                #end if
-            #end if
-        #end if
-        
-    except Exception as err:
-        logger.error("Payload before serialization: buildPayload.metadata: {siteId}, {err}".format(
-            siteId  = siteId,
-            err     = err
-        ))        
-
-    # end try metadata
-
-            
-    # measurement
-    try:
-        
-        measurement = payloadobj.get("measurement")
-    
-    except Exception as err:
-        logger.error("Payload before serialization: buildPayload.measurement: {siteId}, {err}".format(
-            siteId  = siteId,
-            err     = err
-        ))
-
-    # end try measurement
-
-
-    return Payload(
-         ts
-        ,metadata
-        ,measurement
-    )
-
-# end
-
-
-def postToKafka(connection, json_serializer, key, mode, payloadmsg, topic, logger):
-    
-    topic = "factory_iot"
-#    key   = string_serializer(str(key))
-    key   = str(key)
-        
-    if connection is None:
+    if producer is None :
         logger.error("Kafka producer is None, skipping produce.")
-        
+        return 0
+
     else:
     
-        try:
-            if mode == 0:
-                mode = "PostOne"
-                                        
-                payload = buildPayload(payloadmsg, key, logger)
+        if mode == 0:
+            mode = "PostOne"
+                                    
+            logger.debug('Payload before serialization: key: {key}, value: {val}'.format(
+                key = key,
+                val = payloadmsg
+            ))
+            
 
-                value = json_serializer(payload, SerializationContext(topic, MessageField.VALUE))
-
-                connection.produce(
-                    topic       = topic,
-                    key         = key,
-                    value       = value,
+            # Produce message (raw key, Avro-serialized value)
+            try:                       
+                producer.produce(
+                    topic   = topic, 
+                    key     = keyval,
+                    value   = val
                 )
 
-                connection.poll(0)
-            
-            else:
-                mode = "PostMany"
+                producer.poll(0)
                 
-                for val in payloadmsg:     
-                                    
-                    payload = buildPayload(val, key, logger)
-                    
-                    logger.debug(f"Payload before serialization: {payload} (type: {type(payload)})")
+            except KafkaError as kerr:
+                logger.error('connection.postTokafka - mode {mode} - FAILED, for: {key}, Kafka Err: {kerr}'.format(
+                    mode  = mode,
+                    key   = key,
+                    kerr  = kerr
+                ))
+                return 0
 
-                    value = json_serializer(payload, SerializationContext(topic, MessageField.VALUE))
-
-                    connection.produce(
-                        topic       = topic,    
-                        key         = key,
-                        value       = value,
-                    )
-                                    
-                connection.flush()
-
-            #end if
+            except Exception as err:
+                logger.error('connection.postTokafka - mode {mode} - FAILED, for: {key}, Other Err: {err}'.format(
+                    mode = mode,
+                    key  = key,
+                    err  = err
+                ))
+                return 0
+                
+            # end try
             return 1
-        
-        except Exception as err:
-            logger.error('connection.postTokafka.produce - mode {mode} - FAILED, Err: {err}'.format(
-                mode = mode,
-                err  = err
-            ))
-            return 0
+
+        else:          
+            mode = "PostMany"
+                        
+            for val in payloadmsg:      
+                               
+                logger.debug('Payload before serialization: key: {key}, value: {val}'.format(
+                    key = key,
+                    val = payloadmsg
+                ))
+
+                # Produce message (raw key, Avro-serialized value)
+                try:
+                    
+                    producer.produce(
+                        topic   = topic,    
+                        key     = keyval,
+                        value   = val
+                    )
+                    
+                    producer.flush()  # Ensure message is sent
             
-        # end try
-        
+                except KafkaError as kerr:
+                    logger.error('connection.postTokafka - mode {mode} - FAILED, for: {key}, Kafka Err: {kerr}'.format(
+                        mode  = mode,
+                        key   = key,
+                        kerr  = kerr
+                    ))
+                    return 0
+
+                except Exception as err:
+                    logger.error('connection.postTokafka - mode {mode} - FAILED, for: {key}, Other Err: {err}'.format(
+                        mode = mode,
+                        key  = key,
+                        err  = err
+                    ))
+                    return 0
+
+            #end for
+            return 1                
+            
+        # end if
 #end post_to_kafka
 
 

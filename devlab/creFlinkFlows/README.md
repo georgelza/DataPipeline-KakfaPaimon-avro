@@ -18,9 +18,6 @@ Our data will be pushed into `c_paimin.iot.factory_iot` table.
 - The Flink source document that will help us here is: [Kafka CDC](https://paimon.apache.org/docs/0.9/flink/cdc-ingestion/kafka-cdc/).
 
 
-3. creFlinkAgg.sql
-
-Will create asome flink virtual tables `t_f_factory_iot_5min` which will aggregate our data based on a rolling 5min window source from our `c_paimin.iot.factory_iot` table.
 
 
 ## Primary data flow:
@@ -35,7 +32,7 @@ During my initial build of course like anything new, you battle, things might no
 One of my questions was, how to specify my schema-registry, as that would allow Paimon store to know what the table structure needs to be for the data on the Kafka topic.
 
 
-For this I had 2 unknowns... and a 3rd point, how to validate...
+For this I had 3 unknowns... and a 3rd point, how to validate...
 
 1. How do I specify the value.
     

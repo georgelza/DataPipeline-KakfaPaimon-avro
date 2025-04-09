@@ -47,11 +47,9 @@ buildapp:
 #	docker rmi $(docker images -q --filter "dangling=true")
 
 run: 
-	docker compose -p pipeline up -d broker schema-registry control-center  \
+	docker compose -p pipeline up -d postgres broker schema-registry control-center  \
 		minio mc flink-jobmanager flink-taskmanager \
-		postgres metastore hiveserver2  --remove-orphans
-
-# 		minio mc flink-jobmanager flink-taskmanager \
+	 	metastore hiveserver2  --remove-orphans
 
 deploy: createcat
  
@@ -62,6 +60,10 @@ createcat:
 deployCdcTopic: 
 	docker compose exec flink-jobmanager /bsh/creCdcTopic.bsh	
 
+kcat:
+	docker compose -p pipeline up -d kcat
+
+# kcat -b localhost:9092 -t factory_iot
 
 # Run Python app  101,104
 rp1:

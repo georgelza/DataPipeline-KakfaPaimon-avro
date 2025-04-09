@@ -1,10 +1,10 @@
 {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "type": "object",   
+    "$schema": "http://avro-schema.org/draft-04/schema#",
+    "type": "object",
     "properties": {
         "ts": {
             "description": "Timestamp in milliseconds since epoch (UTC)",
-            "type": "number"
+            "type": "long"
         },
         "metadata": {
             "type": "object",

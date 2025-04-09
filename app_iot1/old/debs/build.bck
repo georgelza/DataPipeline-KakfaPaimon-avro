@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.kafka:kafka-clients:3.7.1'
+    implementation 'org.apache.paimon:paimon-bundle:0.9.0'
+
+    // https://medium.com/@santoshkotagiri/setting-up-flink-projects-with-gradle-a-step-by-step-guide-4d1ef85f017
+    implementation "org.apache.flink:flink-streaming-java:1.19.1"
+    implementation "org.apache.flink:flink-clients:1.19.1"
+
+    implimentation "org.apache.flink:flink-sql-avro:1.19.1"
+}
+
+task downloadDeps(type: Copy) {
+  from sourceSets.main.runtimeClasspath
+  into '.'
+}

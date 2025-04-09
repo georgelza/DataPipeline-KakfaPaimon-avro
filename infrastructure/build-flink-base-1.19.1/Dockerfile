@@ -5,7 +5,7 @@ SHELL ["/bin/bash", "-c"]
 ENV DUCKDB_VERSION=1.1.3
 
 RUN echo "--> Install some useful tools" && \
-    build_deps="neovim tree lnav unzip" && \
+    build_deps="neovim tree lnav unzip gradle" && \
     apt-get update && \
     apt-get install -y $build_deps
 

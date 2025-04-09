@@ -1,0 +1,9 @@
+{
+    "name": "factory_iot_key",
+    "namespace": "factory_iot.avsc",
+    "doc": "Factory Telemetry/IoT Key",
+    "type": "record",
+    "fields": [
+        {"type": "int"}
+    ]
+}

@@ -4,10 +4,10 @@
 
 USE CATALOG default_catalog;
 
-CREATE CATALOG c_hive WITH (
-  'type'          = 'hive',
-  'hive-conf-dir' = './conf/'
-);
+  CREATE CATALOG c_hive WITH (
+    'type'          = 'hive',
+    'hive-conf-dir' = './conf/'
+  );
 
 USE CATALOG c_hive;
 

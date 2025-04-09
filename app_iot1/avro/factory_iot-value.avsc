@@ -1,0 +1,52 @@
+{
+  "name": "factory_iot_value", "type": "record",
+  "fields": [
+    {
+        "name": "before", "type": ["null", {
+            "name": "Before", "type": "record",
+            "fields": []
+        }], "default": null
+    },
+    {
+        "name": "after",  "type": {
+            "name": "AfterRecord", "type": "record",
+            "fields": [
+                {"name": "ts", "type": "long", "doc": "UTC Timestamp"},
+                {"name": "metadata", "type": {
+                    "name": "Metadata", "type": "record",
+                    "fields": [
+                        {"name": "siteId","type": "int", "doc": "Factory/Site ID"},
+                        {"name": "deviceId","type": "int", "doc": "Device ID"},
+                        {"name": "sensorId","type": "int", "doc": "Sensor on Device ID"},
+                        {"name": "unit","type": "string", "doc": "Measurement units of sensor"},
+                        {"name": "ts_human","type": ["null", "string"], "default": null, "doc": "Human readable Timestamp"},
+                        {
+                        "name": "location", "type": ["null", {
+                            "name": "Location", "type": "record",
+                            "fields": [
+                                { "name": "latitude", "type": "double" },
+                                { "name": "longitude", "type": "double" }
+                            ]
+                        }], "default": null, "doc": "GPS Coords of Factory/Site"},
+                        {"name": "deviceType", "type": ["null", "string"], "default": null, "doc": "Device Description"}
+                    ]
+                    }
+            },
+            { "name": "measurement", "type": "double", "doc": "Measurement retrieved at UTC timestamp for Sensor on Device located at Site"}
+            ]
+        }
+    },
+    {"name": "ts_ms", "type": "long", "doc": "UTC Timestamp"},
+    {"name": "source", "type": ["null",{
+        "name": "Source", "type": "record",
+        "fields": [
+            { "name": "version", "type": ["null", "string"], "default": null },
+            { "name": "connector", "type": ["null", "string"], "default": null },
+            { "name": "name", "type": ["null", "string"], "default": null },
+            { "name": "db", "type": ["null", "string"], "default": null },
+            { "name": "table", "type": ["null", "string"], "default": null }
+        ]}], "default": null
+    },
+    {"name": "op", "type": "string", "default": "c"}
+  ]
+}

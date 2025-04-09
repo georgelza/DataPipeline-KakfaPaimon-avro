@@ -1,0 +1,33 @@
+{
+    "name": "factory_iot_value",
+    "doc": "Factory Telemetry/IoT measurements",
+    "namespace": "factory_iot.avro",
+    "type": "record",
+    "fields": [
+        {"name": "ts", "type": "long", "doc": "UTC Timestamp", "logicalType": "timestamp-millis"},
+        {"name": "metadata", "type": [
+                {"type": "record",
+                 "name": "metadata",
+                 "fields": [
+                    {"name": "siteId","type": "int", "doc": "Factory/Site ID"},
+                    {"name": "deviceId","type": "int", "doc": "Device ID"},
+                    {"name": "sensorId","type": "int", "doc": "Sensor on Device ID"},
+                    {"name": "unit","type": "string", "doc": "Measurement units of sensor"},
+                    {"name": "ts_human","type": ["null", "string"], "default": null, "doc": "Human readable Timestamp"},
+                    {"name": "location", "type": ["null",
+                        {"name": "location","type": "record",
+                            "fields": [
+                                {"name": "latitude", "type": "double"},
+                                {"name": "longitude", "type": "double"}
+                            ]
+                        }
+                    ], "default": null, "doc": "GPS Coords of Factory/Site"},
+                    {"name": "deviceType", "type": ["null", "string"], "default": null, "doc": "Device Description"}
+                    ]
+                }
+            ]
+        },
+        {"name": "measurement", "type": "double", "doc": "Measurement retried at UTC timestamp for Sensor on Device located at Site"},
+        {"name": "op", "type": "string", "default": "c"}
+    ]
+}

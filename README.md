@@ -49,8 +49,7 @@ Below is a list of the various pauloads that can be created.
         "deviceId" : 1042,
         "sensorId" : 10180,
         "unit" : "Psi",
-        "ts_human" : "2024-10-02T00:00:00.869Z",
-
+        "ts_human" : "2024-10-02T00:00:00.869Z"
     },
     "measurement" : 1013.3997
 }
@@ -91,7 +90,7 @@ Below is a list of the various pauloads that can be created.
             "latitude": -26.195246, 
             "longitude": 28.034088
         },
-        "deviceType" : "Oil Pump",
+        "deviceType" : "Oil Pump"
     },
     "measurement" : 1013.3997
 }

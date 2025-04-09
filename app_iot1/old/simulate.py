@@ -72,6 +72,7 @@ def convert_to_utc(local_time_with_tz):
 def generate_payload(site, device, sensor, current_time, time_zone_offset, config_params):
         
     payload = None
+    key     = None
  
     # Adjust the timestamp to include the site's local timezone offset
     offset_hours, offset_minutes = map(int, time_zone_offset.split(":"))
@@ -90,14 +91,43 @@ def generate_payload(site, device, sensor, current_time, time_zone_offset, confi
             ts = int(utc_time.timestamp() * 1000) # Convert to timestamp (milliseconds)
             
         #end 
-                        
+        
+        measurement = progress_value(sensor, current_time, device["sfd_start_time"], device["sfd_end_time"], device["stabilityFactor"])
+
+        # if config_params["TSHUMAN"] != 1:
+        #     ts_human = None
+        
+        # if config_params["STRUCTMOD"] == 1:
+        #     location = site["location"]
+        # else:
+        #     location = None
+            
+        # if config_params["DEVICETYPE"] == 1:
+        #     deviceType = device["deviceType"]
+        # else:
+        #     deviceType = None
+            
+        # payload = {
+        #     "ts": ts,
+        #     "metadata": {
+        #         "siteId":     site["siteId"],
+        #         "deviceId":   device["deviceId"],
+        #         "sensorId":   sensor["sensorId"],
+        #         "unit":       sensor["unit"],
+        #         "ts_human":   ts_human,    # Nullable
+        #         "location":   location,    # Nullable
+        #         "deviceType": deviceType   # Nullable
+        #     },
+        #     "measurement": measurement
+        # }
+                
         metadata = {
             "siteId":     site["siteId"],
             "deviceId":   device["deviceId"],
             "sensorId":   sensor["sensorId"],
             "unit":       sensor["unit"]
         }
-   
+
         if config_params["TSHUMAN"] == 1:
             metadata["ts_human"] = ts_human
         
@@ -106,22 +136,19 @@ def generate_payload(site, device, sensor, current_time, time_zone_offset, confi
 
         if config_params["DEVICETYPE"] == 1:
             metadata["deviceType"] = device["deviceType"]
-        
-        measurement = progress_value(sensor, current_time, device["sfd_start_time"], device["sfd_end_time"], device["stabilityFactor"])
-        
-        ps = {
-            "after": {
-                "ts": ts,
-                "metadata": metadata,
-                "measurement": measurement
-            } ,
-            "ts_ms": ts
+                
+        payload = {
+            "ts": ts,
+            "metadata": metadata,
+            "measurement": measurement
         }
         
+        key = {"siteId": site["siteId"]}
+
     except:
         pass
     
-    return ps
+    return payload, key
 
 # end generate_payload
 
@@ -229,13 +256,17 @@ def run_simulation(site, current_time, config_params):
         
     # end if
 
+
     batch_flush_counter         = 0
     historical_record_counter   = 0
     current_record_counter      = 0
     total_record_counter        = 0
     
     connection_saver            = None
-
+    value_serializer            = None
+    avro_valueschema_str        = None
+    key_serializer              = None 
+    avro_keyschema_str          = None
     
     if site["data_persistence"] > 0:
         flush_size      = site["flush_size"]
@@ -248,8 +279,8 @@ def run_simulation(site, current_time, config_params):
 
         # end if
                 
-        connection_saver = connection.createConnectionToStore(config_params, site, logger)      
-            
+        connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str = connection.createConnectionToStore(config_params, site, logger)      
+          
         if connection_saver == -1:
             logger.critical(f"SiteId: {str(site["siteId"])} - createConnectionToStore.connection_saver Failed, exiting.")
             os._exit(1)
@@ -285,11 +316,11 @@ def run_simulation(site, current_time, config_params):
             
             
             payloadset = []
-            
+            key        = None
             for device in site["devices"]:
                 for sensor in device["sensors"]:
                     
-                    payload = generate_payload(site, device, sensor, oldest_time, site_time_zone, config_params)
+                    payload, key = generate_payload(site, device, sensor, oldest_time, site_time_zone, config_params)
                                         
                     batch_flush_counter += 1
                     historical_record_counter += 1
@@ -297,8 +328,7 @@ def run_simulation(site, current_time, config_params):
                     
                     if site["data_persistence"] > 0:  # Lets save it...
                         if mode == 1:   # save One
-                            result = connection.savePayloadToStore(connection_saver, site, mode, payload, topic, logger)
-                                
+                            result              = connection.savePayloadToStore(connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str, site, mode, payload, key, topic, logger)
                             batch_flush_counter = 0
                             
                         else: # save Many          
@@ -307,7 +337,7 @@ def run_simulation(site, current_time, config_params):
                             
                             if batch_flush_counter==flush_size:  # Post and Flush...
                                                                 
-                                result = connection.savePayloadToStore(connection_saver, site, mode, payloadset, topic, logger)
+                                result = connection.savePayloadToStore(connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str, site, mode, payloadset, key, topic, logger)
                                 
                                 logger.debug("  Flushed/Adding {batch_flush_counter} to {total_record_counter}".format(
                                     batch_flush_counter  = batch_flush_counter,
@@ -317,12 +347,13 @@ def run_simulation(site, current_time, config_params):
                                 # Reset Flush (recs_processed) Counter
                                 batch_flush_counter = 0
                                 payloadset          = []
+                                key                 = None
                                 
                             # end if
                         # end if
                     # end if
                     
-                    sensor["last_value"] = payload["after"]["measurement"]
+                    sensor["last_value"] = payload["measurement"]
                 
                 # end for
             # end for
@@ -334,7 +365,7 @@ def run_simulation(site, current_time, config_params):
     
         # Post last batch of records in our mydocs variable to our connection store
         if site["data_persistence"] > 0 and mode == 2 and batch_flush_counter > 0 :
-            result = connection.savePayloadToStore(connection_saver, site, mode, payloadset,  topic, logger)
+            result = connection.savePayloadToStore(connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str, site, mode, payloadset, key, topic, logger)
             
             logger.debug("  Flushing/Adding {batch_flush_counter} to {total_record_counter}".format(
                 batch_flush_counter=batch_flush_counter,
@@ -361,6 +392,7 @@ def run_simulation(site, current_time, config_params):
         if site["data_persistence"] == 2:
             batch_flush_counter  = 0
             payloadset           = []
+            key                  = None
             
         # end if
          
@@ -385,7 +417,7 @@ def run_simulation(site, current_time, config_params):
             for device in site["devices"]:
                 for sensor in device["sensors"]:
     
-                    payload = generate_payload(site, device, sensor, current_loop_time, site_time_zone, config_params)
+                    payload, key = generate_payload(site, device, sensor, current_loop_time, site_time_zone, config_params)
 
                     batch_flush_counter += 1
                     current_record_counter += 1
@@ -394,8 +426,7 @@ def run_simulation(site, current_time, config_params):
 
                     if site["data_persistence"] > 0:
                         if mode == 1:
-                            result = connection.savePayloadToStore(connection_saver, site, mode, payload, topic, logger)
-                            
+                            result = connection.savePayloadToStore(connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str, site, mode, payload, key, topic, logger)
                             batch_flush_counter = 0
                             
                         else:
@@ -403,7 +434,7 @@ def run_simulation(site, current_time, config_params):
                         
                             if batch_flush_counter==flush_size:
                                 # Post to MongoDB
-                                result = connection.savePayloadToStore(connection_saver, site, mode, payloadset, topic, logger)
+                                result = connection.savePayloadToStore(connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str, site, mode, payloadset,key,  topic, logger)
                                 
                                 logger.debug("  Flushing/Adding {batch_flush_counter} to {current_record_counter}".format(
                                     batch_flush_counter=batch_flush_counter,
@@ -414,6 +445,7 @@ def run_simulation(site, current_time, config_params):
                                 # Reset Flush (recs_processed) Counter
                                 batch_flush_counter  = 0
                                 payloadset           = []
+                                key                  = None
                                 
                             # end if
                         # end if
@@ -436,7 +468,7 @@ def run_simulation(site, current_time, config_params):
         
         # Post last batch of records in our mydocs variable to our connection store
         if site["data_persistence"] > 0 and mode == 2 and batch_flush_counter > 0 :
-            result = connection.savePayloadToStore(connection_saver, site, mode, payloadset, topic, logger)
+            result = connection.savePayloadToStore(connection_saver, value_serializer, avro_valueschema_str, key_serializer, avro_keyschema_str, site, mode, payloadset, key, topic, logger)
             
             logger.debug("  Flushing/Adding {batch_flush_counter} to {current_record_counter}".format(
                 batch_flush_counter     = batch_flush_counter,

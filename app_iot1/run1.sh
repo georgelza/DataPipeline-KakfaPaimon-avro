@@ -61,3 +61,8 @@ export STRUCTMOD=0
 export DEVICETYPE=0
 
 python3 main.py
+
+# kcat -C -b localhost:9092 \
+#     -t factory_iot \
+#     -r localhost:9081 \
+#     -p 0 -o -1 -s value=avro -e

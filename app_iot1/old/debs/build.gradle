@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+}
+
+task downloadDeps(type: Copy) {
+  from sourceSets.main.runtimeClasspath
+  into '.'
+}
