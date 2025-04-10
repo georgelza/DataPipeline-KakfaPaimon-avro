@@ -12,10 +12,10 @@
             "name": "AfterRecord", "type": "record",
             "fields": [
                 {"name": "ts", "type": "long", "doc": "UTC Timestamp"},
+                {"name": "siteId","type": "int", "doc": "Factory/Site ID"},
                 {"name": "metadata", "type": {
                     "name": "Metadata", "type": "record",
                     "fields": [
-                        {"name": "siteId","type": "int", "doc": "Factory/Site ID"},
                         {"name": "deviceId","type": "int", "doc": "Device ID"},
                         {"name": "sensorId","type": "int", "doc": "Sensor on Device ID"},
                         {"name": "unit","type": "string", "doc": "Measurement units of sensor"},

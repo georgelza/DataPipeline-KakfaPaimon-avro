@@ -55,6 +55,7 @@ Below is a list of the various pauloads that can be created.
 }
 ```
 
+
 ### Modified IoT Payload -> schema evolution, we add location tag.
 
 ```json5
@@ -79,7 +80,7 @@ Below is a list of the various pauloads that can be created.
 
 ```json5
 {
-    "timestamp" : "2024-10-02T00:00:00.869Z",
+    "ts" : "2024-10-02T00:00:00.869Z",
     "metadata" : {
         "siteId" : 1009,
         "deviceId" : 1042,
@@ -95,6 +96,28 @@ Below is a list of the various pauloads that can be created.
     "measurement" : 1013.3997
 }
 ```
+
+### NBBBBBB - REQUIREDTO Modify IoT Payload -> Moved siteId to root level, to accommodate Paimons primary key requirement, even though it is not unique ;), because we specified siteID as a key at schema registry it is expected at the root level.
+
+```json5
+{
+    "ts" : "2024-10-02T00:00:00.869Z",
+    "siteId" : 1009,
+    "metadata" : {
+        "deviceId" : 1042,
+        "sensorId" : 10180,
+        "unit" : "Psi",
+        "ts_human" : "2024-10-02T00:00:00.869Z",
+        "location": {
+            "latitude": -26.195246, 
+            "longitude": 28.034088
+        },
+        "deviceType" : "Oil Pump"
+    },
+    "measurement" : 1013.3997
+}
+```
+
 
 
 ## To run the project.

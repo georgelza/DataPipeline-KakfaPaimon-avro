@@ -1,9 +1,0 @@
-{
-    "name": "factory_iot_key",
-    "doc": "Factory Telemetry/IoT Key",
-    "namespace": "factory_iot.avro",
-    "type": "record",
-    "fields": [
-        {"name": "siteId", "type": "int"}
-    ]
-}

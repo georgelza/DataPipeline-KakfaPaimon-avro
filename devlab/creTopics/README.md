@@ -4,13 +4,15 @@ Shell script (creTopics.sh) to create topic...
 
 - factory_iot
 
-Shell script to call the below scripts that add the Kafka topic schema entries.
+Script to create the Avro Schema's definitions for the Kafka Key value:
 
-- reg_telemetry.sh
+- reg_key.sh
 
-Avro Schema's definitions contained in:
+Script to create the Avro Schema's definitions for the Kafka payload value:
 
-- reg_telemetry.avsc
+- reg_value.sh
+
+The required schema definitions can be found in <root>/app_iot1/avro/
 
 Make sure to populate match the "COMPOSE_PROJECT_NAME" with the value used in the .env driving the docker compose project names.
 

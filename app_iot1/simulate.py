@@ -92,7 +92,6 @@ def generate_payload(site, device, sensor, current_time, time_zone_offset, confi
         #end 
                         
         metadata = {
-            "siteId":     site["siteId"],
             "deviceId":   device["deviceId"],
             "sensorId":   sensor["sensorId"],
             "unit":       sensor["unit"]
@@ -100,20 +99,22 @@ def generate_payload(site, device, sensor, current_time, time_zone_offset, confi
    
         if config_params["TSHUMAN"] == 1:
             metadata["ts_human"] = ts_human
-        
+
         if config_params["STRUCTMOD"] == 1:
             metadata["location"] = site["location"]
 
         if config_params["DEVICETYPE"] == 1:
             metadata["deviceType"] = device["deviceType"]
-        
+
+
         measurement = progress_value(sensor, current_time, device["sfd_start_time"], device["sfd_end_time"], device["stabilityFactor"])
         
         ps = {
             "after": {
-                "ts": ts,
-                "metadata": metadata,
-                "measurement": measurement
+                "siteId":       site["siteId"],
+                "ts":           ts,
+                "metadata":     metadata,
+                "measurement":  measurement
             } ,
             "ts_ms": ts
         }

@@ -1,9 +1,0 @@
-{
-  "namespace": "factory_iot.avsc",
-  "doc": "Factory Telemetry IoT Payload key.",
-  "type": "record",
-  "name": "factory_iot_key",
-  "fields": [
-    {"name": "siteId","type": "int"}
-  ]
-}

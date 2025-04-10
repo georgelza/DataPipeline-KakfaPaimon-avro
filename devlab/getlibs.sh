@@ -10,16 +10,11 @@ cd $curhome/data/flink/lib/kafka
 wget https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.17.0/jackson-annotations-2.17.0.jar
 wget https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.17.0/jackson-core-2.17.0.jar
 wget https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.17.0/jackson-databind-2.17.0.jar
-
 wget https://packages.confluent.io/maven/io/confluent/kafka-avro-serializer/7.7.1/kafka-avro-serializer-7.7.1.jar
 wget https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.7.1/kafka-clients-3.7.1.jar
 wget https://packages.confluent.io/maven/io/confluent/kafka-schema-registry-client/7.7.1/kafka-schema-registry-client-7.7.1.jar
 wget https://packages.confluent.io/maven/io/confluent/kafka-schema-serializer/7.7.1/kafka-schema-serializer-7.7.1.jar
 cd $curhome
-
-#wget https://packages.confluent.io/maven/io/confluent/kafka-streams-avro-serde/7.7.1/kafka-streams-avro-serde-7.7.1.jar
-#wget https://packages.confluent.io/maven/io/confluent/kafka-schema-registry/7.7.1/kafka-schema-registry-7.7.1.jar
-#wget https://packages.confluent.io/maven/io/confluent/kafka-serde-tools-package/7.7.1/kafka-serde-tools-package-7.7.1-tests.jar
 
 
 echo "--> Install JARs: Flink's connector" 
@@ -28,17 +23,11 @@ cd $curhome/data/flink/lib/flink
 wget https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar
 wget https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.2.0-1.19/flink-sql-connector-kafka-3.2.0-1.19.jar 
 wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-parquet/1.19.1/flink-sql-parquet-1.19.1.jar 
-
 wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-avro/1.19.1/flink-avro-1.19.1.jar
+wget https://repo1.maven.org/maven2/org/apache/avro/avro/1.11.3/avro-1.11.3.jar
 
-#wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-avro-confluent-registry/1.9.1/flink-avro-confluent-registry-1.9.1.jar
-#wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-avro/1.19.1/flink-sql-avro-1.19.1.jar
-#wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-avro-confluent-registry/1.19.1/flink-sql-avro-confluent-registry-1.19.1.jar
 
 cd $curhome
-
-#wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-json/1.19.1/flink-sql-json-1.19.1.jar
-#wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/3.2.0/flink-cdc-pipeline-connector-kafka-3.2.0.jar
 
 
 echo "--> Install JARs: Flink's Hive Metastore connector (Catalogs)" 
@@ -62,10 +51,6 @@ wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-mapreduce-client-co
 wget https://repo1.maven.org/maven2/org/apache/hadoop/thirdparty/hadoop-shaded-guava/1.1.1/hadoop-shaded-guava-1.1.1.jar
 wget https://repo1.maven.org/maven2/org/codehaus/woodstox/stax2-api/4.2.1/stax2-api-4.2.1.jar 
 wget https://repo1.maven.org/maven2/com/fasterxml/woodstox/woodstox-core/5.3.0/woodstox-core-5.3.0.jar 
-
-#wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar
-#wget https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
-
 cd $curhome
 
 
@@ -77,7 +62,4 @@ wget https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-1.19/0.9.0/pa
 wget https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-action/0.9.0/paimon-flink-action-0.9.0.jar 
 wget https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-hive-connector-3.1/0.9.0/paimon-hive-connector-3.1-0.9.0.jar
 wget https://repo1.maven.org/maven2/org/apache/paimon/paimon-s3/0.9.0/paimon-s3-0.9.0.jar
-
-# wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-connector-jdbc/3.2.0-1.19/flink-connector-jdbc-3.2.0-1.19.jar 
-
 cd $curhome

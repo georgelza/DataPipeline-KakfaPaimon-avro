@@ -97,6 +97,7 @@ start:
 
 down:	
 	docker compose down
+	cd data/minio; rm -rf .minio.sys 
 	cd data/minio; rm -rf * 
 	cd data/postgres; rm -rf *
 	cd data/warehouse; rm -rf *

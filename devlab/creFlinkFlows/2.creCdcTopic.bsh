@@ -4,7 +4,7 @@
 # This will pull a topic into Paimon
 
 # https://paimon.apache.org/docs/master/cdc-ingestion/kafka-cdc/
-
+     
 
 /opt/flink/bin/flink run \
         /opt/flink/lib/paimon/paimon-flink-action-0.9.0.jar \
@@ -26,19 +26,21 @@
         --warehouse s3a://warehouse/paimon/ \
         --database iot \
         --table factory_iot \
+        --table_conf changelog-producer=input \
+        --table_conf write-mode=append-only \
         --table_conf sink.parallelism=4 
 
 
 
-        --table_conf changelog-producer=input
- 
-        --mode divided \       
-        --table_conf bucket=2 \
+# optional ideas.... failing at the moment still thouth.
 
-        --partition_keys timeslot_year \
-        --computed_column 'timeslot_year=year(ts)'
-        --computed_column 'timeslot_year=year(ts)', 'timeslot_month=month(ts)'
+        --computed_column 'timeslot_year=year(ts)' \
+        --partition_keys timeslot_year
 
 
- 
- 
+        --computed_column 'timeslot_year=year(ts)' \
+        --computer_column 'timeslot_month=month(ts)' \
+        --partition_keys timeslot_year, timeslot_month  
+
+        --table_conf bucket=4 \
+        --table_conf bucket-key=siteId

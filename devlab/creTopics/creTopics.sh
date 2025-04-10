@@ -12,5 +12,3 @@ docker compose exec broker kafka-topics \
 docker compose exec broker kafka-topics \
  --bootstrap-server localhost:9092 \
  --list | grep -v '_confluent' |grep -v '__' |grep -v '_schemas' | grep -v 'default' | grep -v 'docker-connect'
-
-#./reg_telemetry.sh
