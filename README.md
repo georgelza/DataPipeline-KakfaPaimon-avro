@@ -22,15 +22,22 @@ Data to be stored as **Apache Parquet** and **Apache Avro** onto **MinIO S3** Ob
 
 ## IoT Payload
 
-Below is a list of the various pauloads that can be created.
+Below is a list of the various payloads that can be created.
+
+NBBBBBB - Please Note... if you were following my previous blogs in the series, you would notice it was REQUIRED TO modify the original IoT Payload -> We moved `siteId` to root level of the payload.
+
+This was caused by the pull/infer schema/create table/push data pipeline we creating using Avro serialized data and the schema Registry integratio example. The topic key is "imagined" to be the primary key on the table, even though no key/index is created and well we know siteId's are not unique.  
+
+Then you will see on the topic itself, the payload is now nested undera after tag, with a before being null, this is required bythe Debezium Avro source connector.
+
 
 ### Basic min IoT Payload
 
 ```json5
 {
     "ts" : 123421452622,
+    "siteId" : 1009,
     "metadata" : {
-        "siteId" : 1009,
         "deviceId" : 1042,
         "sensorId" : 10180,
         "unit" : "Psi"
@@ -41,11 +48,12 @@ Below is a list of the various pauloads that can be created.
 
 ### Basic min IoT Payload, with a human readable time stamp
 
+
 ```json5
 {
     "ts" : 123421452622,
+    "siteId" : 1009,
     "metadata" : {
-        "siteId" : 1009,
         "deviceId" : 1042,
         "sensorId" : 10180,
         "unit" : "Psi",
@@ -61,8 +69,8 @@ Below is a list of the various pauloads that can be created.
 ```json5
 {
     "ts" : 123421452622,
+    "siteId" : 1009,
     "metadata" : {
-        "siteId" : 1009,
         "deviceId" : 1042,
         "sensorId" : 10180,
         "unit" : "Psi",
@@ -76,28 +84,7 @@ Below is a list of the various pauloads that can be created.
 }
 ```
 
-### Modified IoT Payload -> schema evolution, here we added location and deviceType tag.
-
-```json5
-{
-    "ts" : "2024-10-02T00:00:00.869Z",
-    "metadata" : {
-        "siteId" : 1009,
-        "deviceId" : 1042,
-        "sensorId" : 10180,
-        "unit" : "Psi",
-        "ts_human" : "2024-10-02T00:00:00.869Z",
-        "location": {
-            "latitude": -26.195246, 
-            "longitude": 28.034088
-        },
-        "deviceType" : "Oil Pump"
-    },
-    "measurement" : 1013.3997
-}
-```
-
-### NBBBBBB - REQUIREDTO Modify IoT Payload -> Moved siteId to root level, to accommodate Paimons primary key requirement, even though it is not unique ;), because we specified siteID as a key at schema registry it is expected at the root level.
+### Modified IoT Payload -> schema evolution, here we further deviceType tag.
 
 ```json5
 {
@@ -117,7 +104,6 @@ Below is a list of the various pauloads that can be created.
     "measurement" : 1013.3997
 }
 ```
-
 
 
 ## To run the project.
